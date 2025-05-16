@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xóm trọ yêu thưn</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .chat-container {
+      width: 350px;
+      height: 500px;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+      border-top-left-radius: 5px;
+      border-top-right-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .chat-header .online-count {
+      font-size: 12px;
+    }
+    .chat-body {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      border-bottom: 1px solid #ccc;
+    }
+    .message {
+      margin-bottom: 10px;
+    }
+    .message .time {
+      font-size: 12px;
+      color: #888;
+    }
+    .message .content {
+      background-color: #e1f5fe;
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: inline-block;
+      margin-top: 5px;
+    }
+    .notification {
+      color: #666;
+      font-style: italic;
+    }
+    .chat-footer {
+      display: flex;
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-bottom-left-radius: 5px;
+      border-bottom-right-radius: 5px;
+    }
+    .chat-footer input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+    .chat-footer button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .chat-footer button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      Box Chat Cho Mấy Con Dời
+      <span class="online-count" id="onlineCount">0 người online</span>
+    </div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-footer">
+      <input type="text" id="messageInput" placeholder="Nhập tin nhắn...">
+      <button onclick="sendMessage()">Gửi</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Kết nối đến server Socket.IO local
+    const socket = io();
+
+    // Lấy các phần tử DOM
+    const chatBody = document.getElementById('chatBody');
+    const messageInput = document.getElementById('messageInput');
+    const onlineCount = document.getElementById('onlineCount');
+
+    // Theo dõi số người online
+    socket.on('userCount', (count) => {
+      onlineCount.textContent = `${count} người online`;
+    });
+
+    // Thông báo khi có người tham gia hoặc rời
+    socket.on('userStatus', (status) => {
+      const notification = document.createElement('div');
+      notification.classList.add('message', 'notification');
+      notification.innerHTML = `<div class="content">${status}</div>`;
+      chatBody.appendChild(notification);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    });
+
+    // Hàm gửi tin nhắn
+    function sendMessage() {
+      const message = messageInput.value.trim();
+      if (message) {
+        const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        socket.emit('chatMessage', { time, message });
+        messageInput.value = '';
+      }
+    }
+
+    // Nhấn Enter để gửi
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Nhận tin nhắn từ server và hiển thị
+    socket.on('chatMessage', (data) => {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message');
+      messageElement.innerHTML = `<div class="time">${data.time}</div><div class="content">${data.message}</div>`;
+      chatBody.appendChild(messageElement);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    });
+  </script>
+</body>
+</html>
