@@ -9,25 +9,41 @@ const io = new Server(server);
 // Phục vụ file tĩnh (index.html)
 app.use(express.static(__dirname));
 
-// Quản lý số người online
+// Quản lý số người online, danh sách username và tin nhắn
 let onlineUsers = 0;
+const connectedUsers = new Set();
+const messages = []; // Mảng lưu tin nhắn
 
 io.on('connection', (socket) => {
-  // Tăng số người online và thông báo
-  onlineUsers++;
-  io.emit('userCount', onlineUsers);
-  io.emit('userStatus', `Có người vừa tham gia! (Tổng: ${onlineUsers})`);
+  // Gửi tin nhắn cũ khi người dùng kết nối
+  socket.emit('initialMessages', messages);
+
+  // Tăng số người online và thêm username khi kết nối
+  socket.on('userConnected', (username) => {
+    if (username && !connectedUsers.has(username)) {
+      connectedUsers.add(username);
+      onlineUsers++;
+      io.emit('userCount', onlineUsers);
+      io.emit('userStatus', { type: 'online', username: username });
+    }
+  });
 
   // Xử lý tin nhắn
   socket.on('chatMessage', (data) => {
-    io.emit('chatMessage', data); // Gửi tin nhắn đến tất cả client
+    const messageData = { username: data.username, time: data.time, content: data.message };
+    messages.push(messageData); // Lưu tin nhắn vào mảng
+    io.emit('chatMessage', messageData);
   });
 
   // Xử lý khi người dùng rời
   socket.on('disconnect', () => {
-    onlineUsers = Math.max(0, onlineUsers - 1); // Đảm bảo không âm
-    io.emit('userCount', onlineUsers);
-    io.emit('userStatus', `Có người vừa rời! (Còn: ${onlineUsers})`);
+    const disconnectedUser = Array.from(connectedUsers).find(user => socket.user === user);
+    if (disconnectedUser && connectedUsers.has(disconnectedUser)) {
+      connectedUsers.delete(disconnectedUser);
+      onlineUsers = Math.max(0, onlineUsers - 1);
+      io.emit('userCount', onlineUsers);
+      io.emit('userStatus', { type: 'offline', username: disconnectedUser });
+    }
   });
 });
 

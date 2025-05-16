@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xóm trọ yêu thưn</title>
+  <title>Box Chat</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -15,6 +15,40 @@
       align-items: center;
       height: 100vh;
     }
+    .login-container {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
+    .login-container.active {
+      display: block;
+    }
+    .login-container input {
+      width: 200px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .login-container button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .login-container button:hover {
+      background-color: #45a049;
+    }
     .chat-container {
       width: 350px;
       height: 500px;
@@ -22,8 +56,11 @@
       border: 1px solid #ccc;
       border-radius: 5px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      display: flex;
+      display: none;
       flex-direction: column;
+    }
+    .chat-container.active {
+      display: flex;
     }
     .chat-header {
       background-color: #4CAF50;
@@ -47,6 +84,10 @@
     }
     .message {
       margin-bottom: 10px;
+    }
+    .message .username {
+      font-weight: bold;
+      color: #2c3e50;
     }
     .message .time {
       font-size: 12px;
@@ -91,9 +132,13 @@
   </style>
 </head>
 <body>
-  <div class="chat-container">
+  <div class="login-container" id="loginContainer">
+    <input type="text" id="usernameInput" placeholder="Nhập tên của bạn...">
+    <button onclick="setUsername()">Vào chat</button>
+  </div>
+  <div class="chat-container" id="chatContainer">
     <div class="chat-header">
-      Box Chat Cho Mấy Con Dời
+      Box Chat
       <span class="online-count" id="onlineCount">0 người online</span>
     </div>
     <div class="chat-body" id="chatBody"></div>
@@ -105,34 +150,69 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // Kết nối đến server Socket.IO local
+    // Kết nối đến server Socket.IO
     const socket = io();
 
     // Lấy các phần tử DOM
+    const loginContainer = document.getElementById('loginContainer');
+    const chatContainer = document.getElementById('chatContainer');
+    const usernameInput = document.getElementById('usernameInput');
     const chatBody = document.getElementById('chatBody');
     const messageInput = document.getElementById('messageInput');
     const onlineCount = document.getElementById('onlineCount');
+
+    let username = localStorage.getItem('username');
+
+    // Hiển thị form nhập tên nếu chưa có username
+    if (!username) {
+      loginContainer.classList.add('active');
+    } else {
+      chatContainer.classList.add('active');
+      socket.emit('userConnected', username);
+    }
+
+    // Đặt username và lưu vào localStorage
+    function setUsername() {
+      username = usernameInput.value.trim();
+      if (username) {
+        localStorage.setItem('username', username);
+        loginContainer.classList.remove('active');
+        chatContainer.classList.add('active');
+        socket.emit('userConnected', username);
+      }
+    }
 
     // Theo dõi số người online
     socket.on('userCount', (count) => {
       onlineCount.textContent = `${count} người online`;
     });
 
-    // Thông báo khi có người tham gia hoặc rời
-    socket.on('userStatus', (status) => {
+    // Thông báo trạng thái (online/offline) với tên
+    socket.on('userStatus', (data) => {
       const notification = document.createElement('div');
       notification.classList.add('message', 'notification');
-      notification.innerHTML = `<div class="content">${status}</div>`;
+      notification.innerHTML = `<div class="content">${data.username} vừa ${data.type === 'online' ? 'tham gia' : 'rời'}!</div>`;
       chatBody.appendChild(notification);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    });
+
+    // Nhận tin nhắn cũ khi kết nối
+    socket.on('initialMessages', (initialMessages) => {
+      initialMessages.forEach(message => {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        messageElement.innerHTML = `<div class="username">${message.username}</div><div class="time">${message.time}</div><div class="content">${message.content}</div>`;
+        chatBody.appendChild(messageElement);
+      });
       chatBody.scrollTop = chatBody.scrollHeight;
     });
 
     // Hàm gửi tin nhắn
     function sendMessage() {
       const message = messageInput.value.trim();
-      if (message) {
+      if (message && username) {
         const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-        socket.emit('chatMessage', { time, message });
+        socket.emit('chatMessage', { username, time, message });
         messageInput.value = '';
       }
     }
@@ -142,11 +222,11 @@
       if (e.key === 'Enter') sendMessage();
     });
 
-    // Nhận tin nhắn từ server và hiển thị
+    // Nhận tin nhắn mới từ server và hiển thị
     socket.on('chatMessage', (data) => {
       const messageElement = document.createElement('div');
       messageElement.classList.add('message');
-      messageElement.innerHTML = `<div class="time">${data.time}</div><div class="content">${data.message}</div>`;
+      messageElement.innerHTML = `<div class="username">${data.username}</div><div class="time">${data.time}</div><div class="content">${data.content}</div>`;
       chatBody.appendChild(messageElement);
       chatBody.scrollTop = chatBody.scrollHeight;
     });
