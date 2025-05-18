@@ -28,9 +28,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Xử lý tin nhắn
+  // Xử lý tin nhắn (văn bản, ảnh, video)
   socket.on('chatMessage', (data) => {
-    const messageData = { username: data.username, time: data.time, content: data.message };
+    const messageData = { username: data.username, time: data.time, content: data.content, type: data.type };
     messages.push(messageData); // Lưu tin nhắn vào mảng
     io.emit('chatMessage', messageData);
   });
